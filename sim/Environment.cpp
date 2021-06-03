@@ -31,7 +31,7 @@ Environment()
 	mSpeedChangeProb(0.05),
 	mMaxHeadingTurnRate(0.15),
 	mRewardGoal(0.0),
-	mEnableGoal(true),
+	mEnableGoal(false),
 	mEnableObstacle(true),
 	mEnableGoalEOE(false),
 	mKinematics(false)
