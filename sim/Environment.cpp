@@ -32,7 +32,7 @@ Environment()
 	mSpeedChangeProb(0.05),
 	mMaxHeadingTurnRate(0.15),
 	mRewardGoal(0.0),
-	mEnableGoal(false),
+	mEnableGoal(true),
 	mEnableObstacle(true),
 	mEnableGoalEOE(false),
 	mKinematics(false)
@@ -92,17 +92,24 @@ Environment()
 	{
 		BVH* bvh = new BVH(std::string(ROOT_DIR)+"/data/bvh/walk_long.bvh");
 		Motion* motion = new Motion(bvh);
-		// int hand = bvh->getNodeIndex("simRightHand");
-		// TwoJointIK ik(bvh, hand);
+		
 		Eigen::Vector3d pos = bvh->getPosition(84);
 		Eigen::MatrixXd rot = bvh->getRotation(84);
-		// Eigen::Isometry3d T_target = bvh->forwardKinematics(pos, rot, hand)[0];
-		// T_target.translation()[0] += 0.25;
-		// T_target.translation()[1] += 0.3;
-		// T_target.translation()[2] += 0.3;
-		// ik.solve(T_target, pos, rot);
+		
 		for(int j=0;j<300;j++)
 			motion->append(pos, rot,false);
+
+		mInitialPosition = pos;
+		mInitialRotation = rot;
+
+		int hand = bvh->getNodeIndex("simRightHand");
+		TwoJointIK ik(bvh, hand);
+
+		Eigen::Isometry3d T_target = bvh->forwardKinematics(mInitialPosition, mInitialRotation, hand)[0];
+		T_target.translation()[0] += 0.25;
+		T_target.translation()[1] += 0.3;
+		T_target.translation()[2] += 0.3;
+		ik.solve(T_target, mInitialPosition, mInitialRotation);
 
 		motion->computeVelocity();
 		mMotions.emplace_back(motion);
@@ -219,10 +226,21 @@ reset(int frame)
 	
 
 
-	Eigen::Vector3d position = mCurrentMotion->getPosition(mFrame);
-	Eigen::MatrixXd rotation = mCurrentMotion->getRotation(mFrame);
+	Eigen::Vector3d position = mInitialPosition;
+	Eigen::MatrixXd rotation = mInitialRotation;
+	// Eigen::Vector3d position = mCurrentMotion->getPosition(mFrame);
+	// Eigen::MatrixXd rotation = mCurrentMotion->getRotation(mFrame);
 	Eigen::Vector3d linear_velocity = mCurrentMotion->getLinearVelocity(mFrame);
 	Eigen::MatrixXd angular_velocity = mCurrentMotion->getAngularVelocity(mFrame);
+
+	mSimCharacter->setPose(position, rotation, linear_velocity, angular_velocity);
+	if(mEnableObstacle)
+		this->generateObstacle();
+	mTargetDoorAngle = 0.0;
+	position = mCurrentMotion->getPosition(mFrame);
+	rotation = mCurrentMotion->getRotation(mFrame);
+	linear_velocity = mCurrentMotion->getLinearVelocity(mFrame);
+	angular_velocity = mCurrentMotion->getAngularVelocity(mFrame);
 
 	mSimCharacter->setPose(position, rotation, linear_velocity, angular_velocity);
 
@@ -279,12 +297,11 @@ reset(int frame)
 		this->resetGoal();
 		this->recordGoal();	
 	}
-	if(mEnableObstacle)
-		this->generateObstacle();
+	
 	mForceCount = 0;
 	mObstacleCount = 0;
 	mObstacleFinishCount = 0;
-	if(mObstacle !=nullptr)
+	if(mObstacle != nullptr)
 	{
 		Eigen::VectorXd pos = mObstacle->getPositions();
 		Eigen::VectorXd vel = mObstacle->getVelocities();
@@ -362,8 +379,6 @@ step(const Eigen::VectorXd& _action)
 		for(int i=0;i<num_sub_steps;i++)
 		{
 			mSimCharacter->actuate(target_pos);
-			if(mEnableObstacle)
-				this->updateObstacle();
 			mWorld->step();
 			auto cr = mWorld->getConstraintSolver()->getLastCollisionResult();
 			auto hand = mSimCharacter->getSkeleton()->getBodyNode("RightHand");
@@ -454,8 +469,10 @@ resetGoal()
 	// com_vel[1] = 0.0;
 
 
+	// mTargetDoorAngle = 
 	// mTargetFrame = 36;
 	// mTargetDoorAngle = dart::math::Random::uniform<double>(-0.5*M_PI, 0.5*M_PI);
+
 	// Eigen::Vector3d z_sim = mSimCharacter->getReferenceTransform().linear().col(2);
 	// Eigen::Vector3d sim_com_vel = mSimCharacter->getSkeleton()->getCOMLinearVelocity();
 	// double sign = z_sim.dot(sim_com_vel);
@@ -492,7 +509,14 @@ updateGoal()
 	// if(mRewardGoal>0.6)
 	// 	mTargetFrame = mTargetFrame>0?0:36;
 	// mTargetFrame = 36;
-	// double error_door_angle = mTargetDoorAngle - mDoor->getPositions()[0];
+
+	// Eigen::Matrix3d R_door = Eigen::AngleAxisd(mObstacle->getPositions()[0], Eigen::Vector3d::UnitY()).toRotationMatrix();
+	// Eigen::Matrix3d R_door_target = Eigen::AngleAxisd(mTargetDoorAngle, Eigen::Vector3d::UnitY()).toRotationMatrix();
+
+	// Eigen::Matrix3d R_diff = R_door.transpose()*R_door_target;
+	// Eigen::AngleAxisd aa_diff(R_diff);
+	// double error_door_angle =  aa_diff.angle()*(aa_diff.axis()[1]);
+	//  = mTargetDoorAngle - mDoor->getPositions()[0];
 	// if(std::abs(error_door_angle)<0.2)
 	// {
 	// 	std::vector<double> pool = {-0.5*M_PI,0.5*M_PI,0.0};
@@ -516,39 +540,51 @@ void
 Environment::
 recordGoal()
 {
+	Eigen::Matrix3d R_door = Eigen::AngleAxisd(mObstacle->getPositions()[0], Eigen::Vector3d::UnitY()).toRotationMatrix();
+	Eigen::Matrix3d R_door_target = Eigen::AngleAxisd(mTargetDoorAngle, Eigen::Vector3d::UnitY()).toRotationMatrix();
 
-	Eigen::Isometry3d T_ref = mSimCharacter->getReferenceTransform();
-	Eigen::Matrix3d R_ref = T_ref.linear();
+	Eigen::Matrix3d R_diff = R_door.transpose()*R_door_target;
+	Eigen::AngleAxisd aa_diff(R_diff);
+	double error_door_angle =  aa_diff.angle()*(aa_diff.axis()[1]);
 
-	Eigen::Vector3d target_com_vel = mSimCharacter->getCartesianMSD()->getPosition();
-	Eigen::Vector3d com_vel = (mSimCharacter->getSkeleton()->getCOM() - mPrevCOM)*mControlHz;
-	com_vel[1] = 0.0;
+	mStateGoal.resize(1);
+	mStateGoal[0] = error_door_angle;
 
-	// mStateGoal = R_ref.transpose()*(com_vel-target_com_vel);
-	// mStateGoal = (com_vel-target_com_vel);
-	mStateGoal.resize(0);
+	mRewardGoal = std::exp(-1.5*error_door_angle*error_door_angle);
 
-	// mStateGoal.setZero();
-	// std::cout<<mStateGoal.transpose()<<std::endl;
 
-	mRewardGoal = 1.0;
+	// Eigen::Isometry3d T_ref = mSimCharacter->getReferenceTransform();
+	// Eigen::Matrix3d R_ref = T_ref.linear();
 
-	if(target_com_vel.norm()>2e-1)
-	{
-		double vel = (target_com_vel - MathUtils::projectOnVector(com_vel, target_com_vel)).norm();
-		// std::cout<<vel<<std::endl;
-		// std::cout<<target_com_vel.norm()<<" "<<MathUtils::projectOnVector(com_vel, target_com_vel).norm()<<std::endl;
-		// if(vel > 0.0){
-			// mRewardGoal = 2*std::exp(-0.25*vel*vel) - 1.0;
-		mRewardGoal = std::exp(-1.5*vel*vel);
-		// }
-	}
-	else
-	{
-		com_vel[1] = 0.0;
-		double vel = com_vel.norm();
-		mRewardGoal = std::exp(-1.5*vel*vel);
-	}
+	// Eigen::Vector3d target_com_vel = mSimCharacter->getCartesianMSD()->getPosition();
+	// Eigen::Vector3d com_vel = (mSimCharacter->getSkeleton()->getCOM() - mPrevCOM)*mControlHz;
+	// com_vel[1] = 0.0;
+
+	// // mStateGoal = R_ref.transpose()*(com_vel-target_com_vel);
+	// // mStateGoal = (com_vel-target_com_vel);
+	// mStateGoal.resize(0);
+
+	// // mStateGoal.setZero();
+	// // std::cout<<mStateGoal.transpose()<<std::endl;
+
+	// mRewardGoal = 1.0;
+
+	// if(target_com_vel.norm()>2e-1)
+	// {
+	// 	double vel = (target_com_vel - MathUtils::projectOnVector(com_vel, target_com_vel)).norm();
+	// 	// std::cout<<vel<<std::endl;
+	// 	// std::cout<<target_com_vel.norm()<<" "<<MathUtils::projectOnVector(com_vel, target_com_vel).norm()<<std::endl;
+	// 	// if(vel > 0.0){
+	// 		// mRewardGoal = 2*std::exp(-0.25*vel*vel) - 1.0;
+	// 	mRewardGoal = std::exp(-1.5*vel*vel);
+	// 	// }
+	// }
+	// else
+	// {
+	// 	com_vel[1] = 0.0;
+	// 	double vel = com_vel.norm();
+	// 	mRewardGoal = std::exp(-1.5*vel*vel);
+	// }
 	// std::cout<<mRewardGoal<<std::endl;
 	mRewardGoals.emplace_back(mRewardGoal);
 	// auto motion = mCurrentMotion;
@@ -783,12 +819,17 @@ void
 Environment::
 updateObstacle()
 {
-	// if(mObstacleCount>mObstacleFinishCount && mObstacle !=nullptr){
-	// 	if(mWorld->hasSkeleton(mObstacle))
-	// 		mWorld->removeSkeleton(mObstacle);
+	if(mObstacleCount>mObstacleFinishCount && mObstacle !=nullptr){
+		mObstacleCount = 0;
+		mObstacleFinishCount = dart::math::Random::uniform<int>(60,120);
+		bool sign = dart::math::Random::uniform<double>(0.0,1.0)<0.5;
+		if(sign)
+			mTargetDoorAngle -= mObstacleFinishCount/100.0;
+		else
+			mTargetDoorAngle += mObstacleFinishCount/100.0;
 
-	// }
-	// mObstacleCount++;
+	}
+	mObstacleCount++;
 	// Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
 	// Eigen::VectorXd generalized_vel = Eigen::VectorXd::Zero(6);
 	// generalized_pos.tail<3>() = mCurrentTargetHandPos;
@@ -802,21 +843,18 @@ generateObstacle()
 {
 	if(mObstacle == nullptr){
 		double width = 1.0;
-		Eigen::Vector3d c0 = Eigen::Vector3d(-width+0.25, 0.0, 0.32);
+		Eigen::Vector3d c0 = Eigen::Vector3d(-width, 0.0, 0.02);
 
 		Eigen::Vector3d hand_com = mSimCharacter->getSkeleton()->getBodyNode("RightHand")->getCOM();
 		c0 += hand_com;
 		c0[1] = 0.0;
 		Eigen::Vector3d anchor = hand_com;
-		anchor[0] += 0.3;
-		anchor[1] += 0.3;
+		// anchor[0] += 0.3;
+		// anchor[1] += 0.3;
 		anchor[2] += 0.3;
 
-
-		
-
 		mObstacle = DARTUtils::createDoor(c0, 1.0);
-
+		mTargetDoorAngle = 0.0;
 		mWorld->addSkeleton(mObstacle);
 
 		// Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
@@ -825,15 +863,18 @@ generateObstacle()
 		// generalized_vel.tail<3>() = mCurrentTargetHandVel;
 		// mObstacle->setPositions(generalized_pos);
 		// mObstacle->setVelocities(generalized_vel);
+		
 		mObstacleCount = 0;
-		mObstacleFinishCount = dart::math::Random::uniform<int>(30,120);
+		mObstacleFinishCount = 0;
 
 		mBallConstraint = std::make_shared<dart::constraint::BallJointConstraint>(mSimCharacter->getSkeleton()->getBodyNode("RightHand"),
 																				mObstacle->getBodyNode(1),
-																				anchor);
+																				mSimCharacter->getSkeleton()->getBodyNode("RightHand")->getCOM());
+																				// c0);
 		mWorld->getConstraintSolver()->addConstraint(mBallConstraint);
 
 	}
+
 	// if(mWorld->hasSkeleton(mObstacle))
 		// return;
 	// mWorld->addSkeleton(mObstacle);

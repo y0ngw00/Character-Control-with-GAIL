@@ -483,7 +483,7 @@ createDoor(const Eigen::Vector3d& c0, double width)
 	T_cj.translation()[1] = 0.5*size[1];
 	T_cj.translation()[2] = 0.5*size[2];
 
-	props = makeRevoluteJointProperties("door",Eigen::Vector3d::UnitY(),T_pj,T_cj,Eigen::Vector1d(-2.0),Eigen::Vector1d(2.0));
+	props = makeRevoluteJointProperties("door",Eigen::Vector3d::UnitY(),T_pj,T_cj,Eigen::Vector1d(-100.0),Eigen::Vector1d(100.0));
 	bn = makeBodyNode(skel,bn,props,"Revolute",inertia);
 
 	bn->createShapeNodeWith<VisualAspect,CollisionAspect,DynamicsAspect>(shape);

@@ -126,6 +126,9 @@ private:
 	void generateTargetHandPos();
 	void updateTargetHandPos();
 	int mTargetHandCount, mTargetHandFinishCount;
+
+	Eigen::MatrixXd mInitialRotation;
+	Eigen::Vector3d mInitialPosition;
 };
 
 #endif

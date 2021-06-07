@@ -534,7 +534,7 @@ getStateAMP()
 		Eigen::Matrix3d R0 = R*(Rd.transpose());
 		Eigen::Vector3d w0 = w - R0*wd;
 		// Eigen::Vector3d w02 = Rd*(w - wd);
-		// p.segment<3>(idx_in_jac) = dart::math::logMap(R0);
+		p.segment<3>(idx_in_jac) = dart::math::logMap(R0);
 		// v.segment<3>(idx_in_jac) = w0;
 		// std::cout<<joint->getName()<<std::endl;
 		// std::cout<<" w("<<w.norm()<<") :"<<w.transpose()<<std::endl;
