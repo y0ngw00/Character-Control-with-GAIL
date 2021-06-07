@@ -823,7 +823,6 @@ updateObstacle()
 		mObstacleCount = 0;
 		mObstacleFinishCount = dart::math::Random::uniform<int>(150,200);
 		bool sign = dart::math::Random::uniform<double>(0.0,1.0)<0.5;
-		std::cout<<sign<<std::endl;
 		if(sign)
 			mTargetDoorAngle = mObstacleFinishCount/100.0*0.5;
 		else
