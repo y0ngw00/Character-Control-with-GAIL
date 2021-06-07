@@ -487,8 +487,8 @@ createDoor(const Eigen::Vector3d& c0, double width)
 	bn = makeBodyNode(skel,bn,props,"Revolute",inertia);
 
 	bn->createShapeNodeWith<VisualAspect,CollisionAspect,DynamicsAspect>(shape);
-	skel->getJoint(1)->setSpringStiffness(0, 1.0);
-	skel->getJoint(1)->setDampingCoefficient(0, 1.0);
+	// skel->getJoint(1)->setSpringStiffness(0, 1.0);
+	// skel->getJoint(1)->setDampingCoefficient(0, 1.0);
 	return skel;
 }
 dart::dynamics::SkeletonPtr
