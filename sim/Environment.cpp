@@ -22,7 +22,7 @@ Environment()
 	mControlHz(30),
 	mSimulationHz(300),
 	mElapsedFrame(0),
-	mMaxElapsedFrame(300),
+	mMaxElapsedFrame(3000),
 	mSimCharacter(nullptr),
 	mKinCharacter(nullptr),
 	mTargetSpeedMin(0.5),
