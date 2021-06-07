@@ -540,17 +540,22 @@ void
 Environment::
 recordGoal()
 {
+	double target_vel = (mTargetDoorAngle - mObstacle->getPositions()[0])/3.0;
+	double vel = mObstacle->getVelocities()[0];
+	// std::cout<<target_vel<<" "<<vel<<std::endl;
 	Eigen::Matrix3d R_door = Eigen::AngleAxisd(mObstacle->getPositions()[0], Eigen::Vector3d::UnitY()).toRotationMatrix();
 	Eigen::Matrix3d R_door_target = Eigen::AngleAxisd(mTargetDoorAngle, Eigen::Vector3d::UnitY()).toRotationMatrix();
 
 	Eigen::Matrix3d R_diff = R_door.transpose()*R_door_target;
 	Eigen::AngleAxisd aa_diff(R_diff);
 	double error_door_angle =  aa_diff.angle()*(aa_diff.axis()[1]);
-
+	double error_door_vel = target_vel - vel;
 	mStateGoal.resize(1);
 	mStateGoal[0] = error_door_angle;
+	mStateGoal[1] = error_door_vel;
 
-	mRewardGoal = std::exp(-1.5*error_door_angle*error_door_angle);
+	mRewardGoal = 0.5*std::exp(-3.0*error_door_angle*error_door_angle) + 0.5*std::exp(-20.0*error_door_vel*error_door_vel);
+	// mRewardGoal = std::exp(-20.0*error_door_vel*error_door_vel);
 
 
 	// Eigen::Isometry3d T_ref = mSimCharacter->getReferenceTransform();
