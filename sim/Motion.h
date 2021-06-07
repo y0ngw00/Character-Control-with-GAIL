@@ -71,6 +71,7 @@ public:
 	static Eigen::Isometry3d getReferenceTransform(const Eigen::Vector3d& pos, const Eigen::MatrixXd& rot);
 	static Motion* blendUpperLowerMotion(BVH* bvh_lb, BVH* bvh_ub, int start_lb, int start_ub);
 	static Motion* parseMotionLabel(const std::string& line, int fps = 30);
+
 private:
 	// static Eigen::VectorXd gJointWeights;
 };

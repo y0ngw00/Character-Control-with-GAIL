@@ -98,7 +98,7 @@ render()
 		{
 			Eigen::Vector3d dir = fs->getHapticPosition(false);
 			Eigen::Vector3d pos = fs->getPosition();
-			// DrawUtils::drawArrow3D(pos, pos+dir, 0.1);
+			DrawUtils::drawArrow3D(pos, pos+dir, 0.1);
 		}
 		DARTRendering::drawForceSensors(mEnvironment->getSimCharacter(),Eigen::Vector3d(0.8,0.7,0.0),Eigen::Vector3d(0.16,0.4,0.0),mSimRenderOption);
 

@@ -9,6 +9,7 @@
 #include "Character.h"
 #include "BVH.h"
 #include "Motion.h"
+#include "TwoJointIK.h"
 #include "dart/collision/bullet/bullet.hpp"
 #include "dart/collision/fcl/fcl.hpp"
 
@@ -22,7 +23,7 @@ Environment()
 	mControlHz(30),
 	mSimulationHz(300),
 	mElapsedFrame(0),
-	mMaxElapsedFrame(3000),
+	mMaxElapsedFrame(300),
 	mSimCharacter(nullptr),
 	mKinCharacter(nullptr),
 	mTargetSpeedMin(0.5),
@@ -91,14 +92,24 @@ Environment()
 	{
 		BVH* bvh = new BVH(std::string(ROOT_DIR)+"/data/bvh/walk_long.bvh");
 		Motion* motion = new Motion(bvh);
+		// int hand = bvh->getNodeIndex("simRightHand");
+		// TwoJointIK ik(bvh, hand);
+		Eigen::Vector3d pos = bvh->getPosition(84);
+		Eigen::MatrixXd rot = bvh->getRotation(84);
+		// Eigen::Isometry3d T_target = bvh->forwardKinematics(pos, rot, hand)[0];
+		// T_target.translation()[0] += 0.25;
+		// T_target.translation()[1] += 0.3;
+		// T_target.translation()[2] += 0.3;
+		// ik.solve(T_target, pos, rot);
 		for(int j=0;j<300;j++)
-			motion->append(bvh->getPosition(84), bvh->getRotation(84),false);
+			motion->append(pos, rot,false);
 
 		motion->computeVelocity();
 		mMotions.emplace_back(motion);
 		// mSimCharacter->buildBVHIndices(motion->getBVH()->getNodeNames());
 		// mKinCharacter->buildBVHIndices(motion->getBVH()->getNodeNames());
 	}
+
 	auto motion = MotionUtils::parseMotionLabel("walk_long.bvh 1:44:04 2:24:00");
 	// auto motion = MotionUtils::parseMotionLabel("walk_long.bvh 0:04:04 2:24:00");
 
@@ -268,20 +279,33 @@ reset(int frame)
 		this->resetGoal();
 		this->recordGoal();	
 	}
-	// if(mEnableObstacle)
-	// 	this->generateObstacle();
+	if(mEnableObstacle)
+		this->generateObstacle();
 	mForceCount = 0;
 	mObstacleCount = 0;
 	mObstacleFinishCount = 0;
-	if(mWorld->hasSkeleton(mObstacle))
-		mWorld->removeSkeleton(mObstacle);
+	if(mObstacle !=nullptr)
+	{
+		Eigen::VectorXd pos = mObstacle->getPositions();
+		Eigen::VectorXd vel = mObstacle->getVelocities();
+		
+		pos.setZero();
+		vel.setZero();
+		
+		mObstacle->setPositions(pos);
+		mObstacle->setVelocities(vel);	
+	}
+	
+
+	// if(mWorld->hasSkeleton(mObstacle))
+	// 	mWorld->removeSkeleton(mObstacle);
 	this->recordState();
 
 	mTargetHandPos = mSimCharacter->getSkeleton()->getBodyNode("LeftHand")->getCOM();
 	// mTargetHandPos2 = mTargetHandPos + 5.0*Eigen::Vector3d::Random();
 	mTargetHandPos2 = mTargetHandPos;
 	mTargetHandCount = 0;
-	mTargetHandFinishCount = dart::math::Random::uniform<int>(0,1);
+	mTargetHandFinishCount = 0;//dart::math::Random::uniform<int>(0,1);
 
 	// mTargetHandFinishCount = dart::math::Random::uniform<int>(30,60);
 	mInitHandPos = mTargetHandPos;
@@ -342,7 +366,7 @@ step(const Eigen::VectorXd& _action)
 				this->updateObstacle();
 			mWorld->step();
 			auto cr = mWorld->getConstraintSolver()->getLastCollisionResult();
-			auto hand = mSimCharacter->getSkeleton()->getBodyNode("LeftHand");
+			auto hand = mSimCharacter->getSkeleton()->getBodyNode("RightHand");
 			double kp = 100.0;
 			double kv = 2.0*sqrt(kp);
 			// Eigen::Vector3d hand_force = kp*(mCurrentTargetHandPos - hand->getCOM()) - kv*hand->getCOMLinearVelocity();
@@ -765,40 +789,48 @@ updateObstacle()
 
 	// }
 	// mObstacleCount++;
-	Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
-	Eigen::VectorXd generalized_vel = Eigen::VectorXd::Zero(6);
-	generalized_pos.tail<3>() = mCurrentTargetHandPos;
-	generalized_vel.tail<3>() = mCurrentTargetHandVel;
-	mObstacle->setPositions(generalized_pos);
-	mObstacle->setVelocities(generalized_vel);	
+	// Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
+	// Eigen::VectorXd generalized_vel = Eigen::VectorXd::Zero(6);
+	// generalized_pos.tail<3>() = mCurrentTargetHandPos;
+	// generalized_vel.tail<3>() = mCurrentTargetHandVel;
+	// mObstacle->setPositions(generalized_pos);
+	// mObstacle->setVelocities(generalized_vel);	
 }
 void
 Environment::
 generateObstacle()
 {
 	if(mObstacle == nullptr){
-		mObstacle = DARTUtils::createBox(1e5,Eigen::Vector3d::Constant(0.07),"Free");
-		// mObstacle = DARTUtils::createBox(80.0,Eigen::Vector3d::Constant(0.2),"Free");
-		mObstacle->getJoint(0)->setDampingCoefficient(0,0.2);
-		mObstacle->getJoint(0)->setDampingCoefficient(1,0.2);
-		mObstacle->getJoint(0)->setDampingCoefficient(2,0.2);
-		mObstacle->getJoint(0)->setDampingCoefficient(3,0.01);
-		mObstacle->getJoint(0)->setDampingCoefficient(4,0.01);
-		mObstacle->getJoint(0)->setDampingCoefficient(5,0.01);
+		double width = 1.0;
+		Eigen::Vector3d c0 = Eigen::Vector3d(-width+0.25, 0.0, 0.32);
+
+		Eigen::Vector3d hand_com = mSimCharacter->getSkeleton()->getBodyNode("RightHand")->getCOM();
+		c0 += hand_com;
+		c0[1] = 0.0;
+		Eigen::Vector3d anchor = hand_com;
+		anchor[0] += 0.3;
+		anchor[1] += 0.3;
+		anchor[2] += 0.3;
+
+
+		
+
+		mObstacle = DARTUtils::createDoor(c0, 1.0);
+
 		mWorld->addSkeleton(mObstacle);
 
-		Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
-		Eigen::VectorXd generalized_vel = Eigen::VectorXd::Zero(6);
-		generalized_pos.tail<3>() = mCurrentTargetHandPos;
-		generalized_vel.tail<3>() = mCurrentTargetHandVel;
-		mObstacle->setPositions(generalized_pos);
-		mObstacle->setVelocities(generalized_vel);
+		// Eigen::VectorXd generalized_pos = Eigen::VectorXd::Zero(6);
+		// Eigen::VectorXd generalized_vel = Eigen::VectorXd::Zero(6);
+		// generalized_pos.tail<3>() = mCurrentTargetHandPos;
+		// generalized_vel.tail<3>() = mCurrentTargetHandVel;
+		// mObstacle->setPositions(generalized_pos);
+		// mObstacle->setVelocities(generalized_vel);
 		mObstacleCount = 0;
 		mObstacleFinishCount = dart::math::Random::uniform<int>(30,120);
 
-		mBallConstraint = std::make_shared<dart::constraint::BallJointConstraint>(mSimCharacter->getSkeleton()->getBodyNode("LeftHand"),
-																				mObstacle->getBodyNode(0),
-																				mSimCharacter->getSkeleton()->getBodyNode("LeftHand")->getCOM());
+		mBallConstraint = std::make_shared<dart::constraint::BallJointConstraint>(mSimCharacter->getSkeleton()->getBodyNode("RightHand"),
+																				mObstacle->getBodyNode(1),
+																				anchor);
 		mWorld->getConstraintSolver()->addConstraint(mBallConstraint);
 
 	}
