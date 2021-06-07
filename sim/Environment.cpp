@@ -821,12 +821,12 @@ updateObstacle()
 {
 	if(mObstacleCount>mObstacleFinishCount && mObstacle !=nullptr){
 		mObstacleCount = 0;
-		mObstacleFinishCount = dart::math::Random::uniform<int>(60,120);
+		mObstacleFinishCount = dart::math::Random::uniform<int>(150,200);
 		bool sign = dart::math::Random::uniform<double>(0.0,1.0)<0.5;
 		if(sign)
-			mTargetDoorAngle -= mObstacleFinishCount/100.0;
+			mTargetDoorAngle = mObstacleFinishCount/100.0*0.5;
 		else
-			mTargetDoorAngle += mObstacleFinishCount/100.0;
+			mTargetDoorAngle = mObstacleFinishCount/100.0*0.5;
 
 	}
 	mObstacleCount++;
@@ -842,7 +842,7 @@ Environment::
 generateObstacle()
 {
 	if(mObstacle == nullptr){
-		double width = 1.0;
+		double width = 3.0;
 		Eigen::Vector3d c0 = Eigen::Vector3d(-width, 0.0, 0.02);
 
 		Eigen::Vector3d hand_com = mSimCharacter->getSkeleton()->getBodyNode("RightHand")->getCOM();
@@ -853,7 +853,7 @@ generateObstacle()
 		// anchor[1] += 0.3;
 		anchor[2] += 0.3;
 
-		mObstacle = DARTUtils::createDoor(c0, 1.0);
+		mObstacle = DARTUtils::createDoor(c0, width);
 		mTargetDoorAngle = 0.0;
 		mWorld->addSkeleton(mObstacle);
 
