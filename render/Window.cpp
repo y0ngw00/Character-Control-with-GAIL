@@ -101,7 +101,7 @@ render()
 			if (dir.norm()>1e-2)
 				DrawUtils::drawArrow3D(pos, pos+dir, 0.1);
 		}
-		DARTRendering::drawForceSensors(mEnvironment->getSimCharacter(),Eigen::Vector3d(0.8,0.7,0.0),Eigen::Vector3d(0.16,0.4,0.0),mSimRenderOption);
+		// DARTRendering::drawForceSensors(mEnvironment->getSimCharacter(),Eigen::Vector3d(0.8,0.7,0.0),Eigen::Vector3d(0.16,0.4,0.0),mSimRenderOption);
 
 		// Eigen::Vector3d com_vel = mEnvironment->getStateGoal();
 		// glColor3f(1,0,0);
