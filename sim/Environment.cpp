@@ -407,11 +407,11 @@ recordGoal()
 
 	mRewardGoal = w_hit * hit_r + w_target * target_r;
 
-	mStateGoal.resize(10);
-	mStateGoal<<com_vel, part_disp, del_part_vel, mStateLabel;
+	// mStateGoal.resize(10);
+	// mStateGoal<<com_vel, part_disp, del_part_vel, mStateLabel;
 
-	// mStateGoal.resize(1);
-	// mStateGoal<<mStateLabel;
+	mStateGoal.resize(1);
+	mStateGoal<<mStateLabel;
 }
 
 double
