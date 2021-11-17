@@ -35,6 +35,8 @@ class SlimFC(nn.Module):
 		layers.append(linear)
 		if activation == "relu":
 			layers.append(nn.ReLU())
+		elif activation == "softmax":
+			layers.append(nn.Softmax())
 		self.model = nn.Sequential(*layers)
 
 	def forward(self, x):
@@ -53,3 +55,10 @@ class AppendLogStd(nn.Module):
 	def forward(self, x):
 		x = torch.cat([x, self.log_std.unsqueeze(0).repeat([len(x), 1])], axis=-1)
 		return x
+
+
+
+def to_one_hot_vector(array, dim):
+	v = (array.squeeze()).astype(int)
+	out = np.eye(dim)[v]
+	return out

@@ -387,7 +387,7 @@ initNN(const std::string& config)
 	py::object pyconfig = policy_md.attr("load_config")(config);
 
 	policy = policy_md.attr("build_policy")(mEnvironment->getDimState(),mEnvironment->getDimStateLabel(),mEnvironment->getDimAction(),pyconfig);
-	discriminator = discriminator_md.attr("build_discriminator")(mEnvironment->getDimStateAMP(), mEnvironment->getDimStateLabel(),mEnvironment->getStateAMPExpert(), pyconfig);
+	discriminator = discriminator_md.attr("build_discriminator")(mEnvironment->getDimStateAMP(), mEnvironment->getNumTotalLabel(),mEnvironment->getDimStateLabel(),mEnvironment->getStateAMPExpert(), pyconfig);
 
 	//TODO
 	

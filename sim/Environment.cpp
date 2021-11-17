@@ -236,10 +236,10 @@ step(const Eigen::VectorXd& _action)
 			else if(bn2->getName().find("Foot") != std::string::npos)
 				continue;
 
-			if(bn1->getName().find("Hand") != std::string::npos)
-				continue;
-			else if(bn2->getName().find("Hand") != std::string::npos)
-				continue;
+			// if(bn1->getName().find("Hand") != std::string::npos)
+			// 	continue;
+			// else if(bn2->getName().find("Hand") != std::string::npos)
+			// 	continue;
 
 			if(skel1->getName() == "humanoid" && skel2->getName() == "ground"){
 				mContactEOE = true;
@@ -346,66 +346,66 @@ Environment::
 recordGoal()
 {
 
-	mRewardGoal = 0.0;
+	mRewardGoal = 1.0;
 	
-	Eigen::Isometry3d T_ref = mSimCharacter->getReferenceTransform();
-	Eigen::Matrix3d R_ref = T_ref.linear();
-	Eigen::Matrix3d R_ref_inv = R_ref.inverse();
+	// Eigen::Isometry3d T_ref = mSimCharacter->getReferenceTransform();
+	// Eigen::Matrix3d R_ref = T_ref.linear();
+	// Eigen::Matrix3d R_ref_inv = R_ref.inverse();
 
-	Eigen::Vector3d root_pos = mSimCharacter->getSkeleton()->getCOM();
-	Eigen::Vector3d com_vel = (root_pos - mPrevCOM)*mControlHz;
-	com_vel[1] = 0.0;
-	com_vel = R_ref_inv * com_vel;
+	// Eigen::Vector3d root_pos = mSimCharacter->getSkeleton()->getCOM();
+	// Eigen::Vector3d com_vel = (root_pos - mPrevCOM)*mControlHz;
+	// com_vel[1] = 0.0;
+	// com_vel = R_ref_inv * com_vel;
 
-	Eigen::Vector3d target_disp = mTargetPos - root_pos;
-	target_disp[1] =0.0;
-	double norm_disp = target_disp.norm();
+	// Eigen::Vector3d target_disp = mTargetPos - root_pos;
+	// target_disp[1] =0.0;
+	// double norm_disp = target_disp.norm();
 
-	Eigen::Vector3d target_dir = Eigen::Vector3d::Zero();
-	if(target_dir.norm() > 1e-5){
-		target_dir = target_disp.normalized();
-	}
+	// Eigen::Vector3d target_dir = Eigen::Vector3d::Zero();
+	// if(target_dir.norm() > 1e-5){
+	// 	target_dir = target_disp.normalized();
+	// }
 
-	auto body_part =  mSimCharacter->getSkeleton()->getBodyNode(strike_bodies[mStateLabel]);
-	Eigen::Vector3d part_pos;
-	Eigen::Vector3d part_vel;
+	// auto body_part =  mSimCharacter->getSkeleton()->getBodyNode(strike_bodies[mStateLabel]);
+	// Eigen::Vector3d part_pos;
+	// Eigen::Vector3d part_vel;
 
-	if(strike_bodies[mStateLabel]=="Hips"){
-		part_pos = root_pos;
-		part_vel = com_vel;
-	} 
-	else {
-		part_pos = body_part->getCOM();
-		part_vel = body_part->getLinearVelocity();
-	}
+	// if(strike_bodies[mStateLabel]=="Hips"){
+	// 	part_pos = root_pos;
+	// 	part_vel = com_vel;
+	// } 
+	// else {
+	// 	part_pos = body_part->getCOM();
+	// 	part_vel = body_part->getLinearVelocity();
+	// }
 
-	Eigen::Vector3d part_disp = mTargetPos - part_pos;
-	part_disp[1] = 0.0;
+	// Eigen::Vector3d part_disp = mTargetPos - part_pos;
+	// part_disp[1] = 0.0;
 
-	double part_speed = target_dir.dot(part_vel);
-	if(std::abs(part_disp.norm()) < mTargetRadius){
-		if(part_speed>=mTargetSpeed || part_speed==0.0)
-			mTargetHit = true;
-	}
+	// double part_speed = target_dir.dot(part_vel);
+	// if(std::abs(part_disp.norm()) < mTargetRadius){
+	// 	if(part_speed>=mTargetSpeed || part_speed==0.0)
+	// 		mTargetHit = true;
+	// }
 
-	part_disp = R_ref_inv * part_disp;
-	double part_disp_norm = part_disp.norm();
+	// part_disp = R_ref_inv * part_disp;
+	// double part_disp_norm = part_disp.norm();
 
-	double pos_r = std::exp(-2.0 * part_disp_norm * part_disp_norm);
+	// double pos_r = std::exp(-2.0 * part_disp_norm * part_disp_norm);
 
-	Eigen::Vector3d del_part_vel = R_ref_inv*(target_dir - part_vel);
+	// Eigen::Vector3d del_part_vel = R_ref_inv*(target_dir - part_vel);
 
-	double vel_r = std::clamp(part_speed/mTargetSpeed, 0.0, 1.0);
-	vel_r *= vel_r;
+	// double vel_r = std::clamp(part_speed/mTargetSpeed, 0.0, 1.0);
+	// vel_r *= vel_r;
 
-	double target_r = std::max(0.0, 0.2 * pos_r + 0.8 * vel_r);
+	// double target_r = std::max(0.0, 0.2 * pos_r + 0.8 * vel_r);
 
-	double w_target = 0.5;
-	double w_hit = 0.5;
+	// double w_target = 0.5;
+	// double w_hit = 0.5;
 
-	double hit_r = mTargetHit? 1.0 : 0.0;
+	// double hit_r = mTargetHit? 1.0 : 0.0;
 
-	mRewardGoal = w_hit * hit_r + w_target * target_r;
+	// mRewardGoal = w_hit * hit_r + w_target * target_r;
 
 	// mStateGoal.resize(10);
 	// mStateGoal<<com_vel, part_disp, del_part_vel, mStateLabel;

@@ -2,5 +2,16 @@ mxm_idle.bvh
 walk_long.bvh
 mxm_lpunch.bvh
 mxm_rpunch.bvh
+mxm_lpunch2.bvh
+mxm_rpunch2.bvh
 mxm_lkick.bvh
 mxm_rkick.bvh
+jog_lsw.bvh
+jump_lsw.bvh
+backflip_lsw.bvh
+walk_drunk.bvh
+walk_hurt_ll.bvh
+walk_wild.bvh
+walk_zombie.bvh
+shuffle_lsw.bvh
+uppercut_lsw.bvh

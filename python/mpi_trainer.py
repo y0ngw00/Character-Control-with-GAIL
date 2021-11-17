@@ -71,7 +71,7 @@ class Trainer(object):
 		return ppo.PPO(self.env.get_dim_state(),self.env.get_dim_state_label(), self.env.get_dim_action(), device, model_config , policy_config)
 
 	def create_disc(self, device, model_config, disc_config):
-		return discriminator.Discriminator(self.env.get_dim_state_AMP(),self.env.get_dim_state_label(), device, model_config, disc_config)
+		return discriminator.Discriminator(self.env.get_dim_state_AMP(),self.env.get_num_total_label(),self.env.get_dim_state_label(), device, model_config, disc_config)
 
 	def create_summary_writer(self, path):
 		self.writer = SummaryWriter(path)
@@ -165,14 +165,10 @@ class Trainer(object):
 		if is_root_proc():
 			state_compressed = torch.cat((state[:,:-dim_label],self.policy_loc.embedding(label)),1)
 		if is_root2_proc():
-			state_compressed = torch.cat((state[:,:-dim_label],self.disc_loc.embedding(label)),1)
+			state_compressed = state
 
 		return state_compressed
 
-	def to_one_hot_vector(self, array, dim):
-		v = (array.squeeze()).astype(int)
-		out = np.eye(dim)[v]
-		return out
 
 	def postprocess_episodes(self):
 		self.policy_episodes = []
@@ -247,10 +243,14 @@ class Trainer(object):
 			n = len(self.samples['STATES_EXPERT'])
 			dim_label = self.env.get_dim_state_label()
 			state = self.disc_loc.state_filter(np.vstack([self.samples['STATES_EXPERT'][:,:-dim_label], self.samples['STATES_AGENT'][:,:-dim_label]]))
-			state = np.concatenate((state, np.vstack([self.samples['STATES_EXPERT'][:,-dim_label:], self.samples['STATES_AGENT'][:,-dim_label:]])), axis=1)
-
+			
+			label = np.vstack([self.samples['STATES_EXPERT'][:,-dim_label:], self.samples['STATES_AGENT'][:,-dim_label:]])
+			
 			self.samples['STATES_EXPERT'] = state[:n]
 			self.samples['STATES_AGENT'] = state[n:]
+			
+			self.samples['LABELS_EXPERT'] = label[:n]
+			self.samples['LABELS_AGENT'] = label[n:]
 
 
 	def generate_shuffle_indices(self, batch_size, minibatch_size):
@@ -308,13 +308,10 @@ class Trainer(object):
 			self.samples['STATES_EXPERT'] = self.disc_loc.convert_to_tensor(self.samples['STATES_EXPERT'])
 			self.samples['STATES_EXPERT2'] = self.disc_loc.convert_to_tensor(self.samples['STATES_EXPERT'])
 			self.samples['STATES_AGENT'] = self.disc_loc.convert_to_tensor(self.samples['STATES_AGENT'])
-
-			self.samples['STATES_EXPERT'] = self.compress_label(self.samples['STATES_EXPERT'])
-			self.samples['STATES_EXPERT2'] = self.compress_label(self.samples['STATES_EXPERT2'])
-			self.samples['STATES_AGENT'] = self.compress_label(self.samples['STATES_AGENT'])
 			
 			disc_loss = 0.0
 			disc_grad_loss = 0.0
+			disc_classify_loss = 0.0
 			expert_accuracy = 0.0
 			agent_accuracy = 0.0
 
@@ -325,9 +322,13 @@ class Trainer(object):
 					states_expert2 = self.samples['STATES_EXPERT2'][minibatch]
 					states_agent = self.samples['STATES_AGENT'][minibatch]
 
-					self.disc_loc.compute_loss(states_expert, states_expert2, states_agent)
+					labels_expert = self.samples['LABELS_EXPERT'][minibatch]
+					labels_agent = self.samples['LABELS_AGENT'][minibatch]
+
+					self.disc_loc.compute_loss(states_expert, states_expert2, states_agent, labels_expert, labels_agent)
 					disc_loss += self.disc_loc.loss.detach()
 					disc_grad_loss += self.disc_loc.grad_loss.detach()
+					disc_classify_loss += self.disc_loc.classify_loss.detach()
 					expert_accuracy += self.disc_loc.expert_accuracy.detach()
 					agent_accuracy += self.disc_loc.agent_accuracy.detach()
 					self.disc_loc.backward_and_apply_gradients()
@@ -335,6 +336,7 @@ class Trainer(object):
 			log = {}
 			log['disc_loss'] = disc_loss.cpu().numpy()
 			log['disc_grad_loss'] = disc_grad_loss.cpu().numpy()
+			log['disc_classify_loss'] = disc_classify_loss.cpu().numpy()
 			log['expert_accuracy'] = expert_accuracy.cpu().numpy()/n/self.num_disc_sgd_iter
 			log['agent_accuracy'] = agent_accuracy.cpu().numpy()/n/self.num_disc_sgd_iter
 			return log
@@ -357,8 +359,9 @@ class Trainer(object):
 																						log_policy['mean_episode_reward_goal'],
 																						log_policy['std'],
 																						self.state_dict['num_samples_so_far']))
-		print('discriminator loss : {:.3f} grad_loss : {:.3f} acc_expert : {:.3f}, acc_agent : {:.3f}'.format(log_disc['disc_loss'],
+		print('discriminator loss : {:.3f} grad_loss : {:.3f} classify_loss : {:.3f} acc_expert : {:.3f}, acc_agent : {:.3f}'.format(log_disc['disc_loss'],
 																						log_disc['disc_grad_loss'],
+																						log_disc['disc_classify_loss'],
 																						log_disc['expert_accuracy'],
 																						log_disc['agent_accuracy']))
 		if writer is not None:
@@ -375,6 +378,9 @@ class Trainer(object):
 				self.state_dict['num_samples_so_far'])
 
 			writer.add_scalar('discriminator/grad_loss',log_disc['disc_grad_loss'],
+				self.state_dict['num_samples_so_far'])
+
+			writer.add_scalar('discriminator/classify_loss',log_disc['disc_classify_loss'],
 				self.state_dict['num_samples_so_far'])
 
 			writer.add_scalar('discriminator/expert_accuracy',log_disc['expert_accuracy'],

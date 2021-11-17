@@ -31,7 +31,6 @@ config = {
 		'activations' : ['relu', 'relu', None],
 		'init_weights' : [0.1, 0.1, 1.0],
 		'embedding_length' : 256,
-		'dim_embedding_out' : 8
 	},
 	
 	'discriminator' : {
